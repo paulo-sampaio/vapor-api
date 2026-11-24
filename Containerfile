@@ -12,9 +12,9 @@ RUN go mod download
 COPY . ./
 
 # Build static CGO_ENABLED=0 binaries
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=linux \
     go build -trimpath -ldflags="-s -w" -o /out/vapor-api ./cmd/api && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    CGO_ENABLED=0 GOOS=linux \
     go build -trimpath -ldflags="-s -w" -o /out/vapor-sync ./cmd/sync
 
 # DB_SOURCE modes:
