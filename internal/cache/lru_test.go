@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nargothrond-pub/vapor/api/internal/cache"
+	"github.com/paulo-sampaio/vapor-api/internal/cache"
 )
 
 func TestLRUEvictionAndPromotion(t *testing.T) {

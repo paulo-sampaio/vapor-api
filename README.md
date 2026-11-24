@@ -1,6 +1,6 @@
 # Vapor API (`vapor-api`)
 
-**Vapor API** is a lightweight, zero-CGO Go REST service paired with an immutable SQLite + FTS5 hardware benchmark catalog. It powers the [Vapor Firefox Extension (`vapor-ff`)](https://github.com/paulo-sampaio/vapor-ff) (hosted at `https://vapor.nargothrond.pub`) by resolving Steam store system requirements against PassMark CPU and GPU benchmarks and returning relative performance percentages.
+**Vapor API** is a lightweight, zero-CGO Go REST service paired with an immutable SQLite + FTS5 hardware benchmark catalog. It powers the [Vapor Firefox Extension (`vapor-ff`)](https://github.com/paulo-sampaio/vapor-ff) (hosted at `https://vapor.kirimure.io`) by resolving Steam store system requirements against PassMark CPU and GPU benchmarks and returning relative performance percentages.
 
 ## Architecture & Design Principles
 

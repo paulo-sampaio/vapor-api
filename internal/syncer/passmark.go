@@ -19,12 +19,12 @@ import (
 
 	"golang.org/x/net/html"
 
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/parser"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/parser"
 )
 
 const (
-	defaultUserAgent = "VaporHardwareSync/1.0 (+https://github.com/nargothrond-pub/vapor)"
+	defaultUserAgent = "VaporHardwareSync/1.0 (+https://vapor.kirimure.io)"
 	cpuMegaURL       = "https://www.cpubenchmark.net/CPU_mega_page.html"
 	cpuMegaDataURL   = "https://www.cpubenchmark.net/data/"
 	cpuListURL       = "https://www.cpubenchmark.net/cpu_list.php"

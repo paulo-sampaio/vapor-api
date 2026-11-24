@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nargothrond-pub/vapor/api/internal/cache"
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/parser"
-	"github.com/nargothrond-pub/vapor/api/internal/syncer"
+	"github.com/paulo-sampaio/vapor-api/internal/cache"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/parser"
+	"github.com/paulo-sampaio/vapor-api/internal/syncer"
 )
 
 func loadSeedCatalog(t *testing.T) *parser.Catalog {

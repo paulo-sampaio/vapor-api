@@ -3,9 +3,9 @@ package compare_test
 import (
 	"testing"
 
-	"github.com/nargothrond-pub/vapor/api/internal/compare"
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/parser"
+	"github.com/paulo-sampaio/vapor-api/internal/compare"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/parser"
 )
 
 func TestEvaluateTierBlendedAndStatusMatrix(t *testing.T) {

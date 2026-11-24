@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/nargothrond-pub/vapor/api/internal/syncer"
+	"github.com/paulo-sampaio/vapor-api/internal/syncer"
 )
 
 func main() {

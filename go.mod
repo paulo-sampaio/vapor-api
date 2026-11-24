@@ -1,4 +1,4 @@
-module github.com/nargothrond-pub/vapor/api
+module github.com/paulo-sampaio/vapor-api
 
 go 1.25.0
 

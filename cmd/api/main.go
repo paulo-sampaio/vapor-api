@@ -15,10 +15,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nargothrond-pub/vapor/api/internal/cache"
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/httpapi"
-	"github.com/nargothrond-pub/vapor/api/internal/parser"
+	"github.com/paulo-sampaio/vapor-api/internal/cache"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/httpapi"
+	"github.com/paulo-sampaio/vapor-api/internal/parser"
 )
 
 func main() {

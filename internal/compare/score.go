@@ -4,8 +4,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/parser"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/parser"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/nargothrond-pub/vapor/api/internal/cache"
-	"github.com/nargothrond-pub/vapor/api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/cache"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
 )
 
 const (

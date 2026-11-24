@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nargothrond-pub/vapor/api/internal/cache"
-	"github.com/nargothrond-pub/vapor/api/internal/compare"
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/parser"
+	"github.com/paulo-sampaio/vapor-api/internal/cache"
+	"github.com/paulo-sampaio/vapor-api/internal/compare"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/parser"
 )
 
 const (

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nargothrond-pub/vapor/api/internal/db"
-	"github.com/nargothrond-pub/vapor/api/internal/syncer"
+	"github.com/paulo-sampaio/vapor-api/internal/db"
+	"github.com/paulo-sampaio/vapor-api/internal/syncer"
 )
 
 func buildTestDB(t *testing.T) string {
