@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  api-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache-dependency-path: go.sum
+
+      - name: Go vet and race tests
+        run: |
+          go vet ./...
+          go test -race -v ./...
+
+      - name: Verify offline seed DB generation
+        run: |
+          go run ./cmd/sync --seed ./testdata/seed_hardware.json --out /tmp/seed.db
+
+  container-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build FROM scratch image with Podman
+        run: podman build -f Containerfile -t vapor-api:ci .
+
+      - name: Smoke test read-only container
+        run: |
+          podman run --rm -d --name vapor-ci --read-only -p 8080:8080 vapor-api:ci
+          trap 'podman stop vapor-ci || true' EXIT
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8080/healthz; then
+              break
+            fi
+            sleep 0.5
+          done
+          podman exec vapor-ci /vapor-api -healthcheck
+          curl -sf "http://127.0.0.1:8080/api/v1/hardware/search?type=gpu&q=rtx%204070"
+          curl -sf -X POST http://127.0.0.1:8080/api/v1/compare \
+            -H "Content-Type: application/json" \
+            -d '{"app_id":"1091500","user":{"cpu_id":"cpu:amd-ryzen-5-5600x","gpu_id":"gpu:geforce-rtx-4070","ram_gb":16},"tiers":[{"key":"win:minimum","os":"win","tier":"minimum","cpu":"Intel Core i7-6700 or AMD Ryzen 5 1600","gpu":"GeForce GTX 1060 6GB","ram":"12 GB RAM"}]}'
+          podman logs vapor-ci | grep '"msg":"spec_parsed"'

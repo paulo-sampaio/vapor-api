@@ -1,0 +1,73 @@
+name: Build & Publish OCI Image
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache-dependency-path: go.sum
+
+      - name: Run Go race tests
+        run: go test -race ./...
+
+      - name: Sync live PassMark database
+        run: |
+          mkdir -p data
+          go run ./cmd/sync --out ./data/hardware.db --min-cpus 1000 --min-gpus 500
+
+      - name: Verify generated hardware.db
+        run: |
+          test -s data/hardware.db
+          sqlite3 data/hardware.db "SELECT kind, COUNT(*) FROM hardware GROUP BY kind;"
+
+      - name: Build FROM scratch OCI image
+        run: |
+          podman build -f Containerfile --build-arg DB_SOURCE=prebaked -t vapor-api:release .
+
+      - name: Smoke test read-only release image
+        run: |
+          podman run --rm -d --name vapor-release --read-only -p 8080:8080 vapor-api:release
+          trap 'podman stop vapor-release || true' EXIT
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8080/healthz; then
+              break
+            fi
+            sleep 0.5
+          done
+          podman exec vapor-release /vapor-api -healthcheck
+          curl -sf "http://127.0.0.1:8080/api/v1/hardware/search?type=gpu&q=rtx"
+          curl -sf -X POST http://127.0.0.1:8080/api/v1/compare \
+            -H "Content-Type: application/json" \
+            -d '{"app_id":"1091500","user":{"cpu_id":"cpu:amd-ryzen-5-5600x","gpu_id":"gpu:geforce-rtx-4070","ram_gb":16},"tiers":[{"key":"win:minimum","os":"win","tier":"minimum","cpu":"Intel Core i7-6700 or AMD Ryzen 5 1600","gpu":"GeForce GTX 1060 6GB","ram":"12 GB RAM"}]}'
+
+      - name: Log in to GHCR and push image tags
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_LC: ${{ github.repository }}
+        run: |
+          IMAGE="ghcr.io/$(echo "$REPO_LC" | tr '[:upper:]' '[:lower:]')"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DATE_TAG="$(date -u +%Y-%m-%d)"
+          echo "$GHCR_TOKEN" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          podman tag vapor-api:release "${IMAGE}:latest"
+          podman tag vapor-api:release "${IMAGE}:sha-${SHORT_SHA}"
+          podman tag vapor-api:release "${IMAGE}:${DATE_TAG}"
+          podman push "${IMAGE}:latest"
+          podman push "${IMAGE}:sha-${SHORT_SHA}"
+          podman push "${IMAGE}:${DATE_TAG}"
