@@ -254,7 +254,7 @@ func tokenizeSearchQuery(q string) []string {
 func buildFTSPrefixExpr(tokens []string) string {
 	parts := make([]string, 0, len(tokens))
 	for _, t := range tokens {
-		parts = append(parts, t+"*")
+		parts = append(parts, `"`+t+`"*`)
 	}
 	return strings.Join(parts, " ")
 }
