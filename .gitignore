@@ -1,0 +1,19 @@
+# Built binaries
+vapor-api
+vapor-sync
+
+# SQLite databases and sidecars
+*.db
+*.db-shm
+*.db-wal
+*.db.tmp
+data/*.db
+
+# Test and coverage outputs
+*.out
+coverage.html
+
+# Local agent workspace
+.agents/
+
+.DS_Store

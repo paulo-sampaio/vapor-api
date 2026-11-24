@@ -1,0 +1,12 @@
+.git/
+.github/
+.agents/
+**/.agents
+*.md
+*.out
+coverage.html
+**/*_test.go
+vapor-api
+vapor-sync
+data/*.db-*
+data/*.tmp
