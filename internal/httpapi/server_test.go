@@ -248,6 +248,53 @@ func TestCompareBundlesPassMarkCompareURLs(t *testing.T) {
 	}
 }
 
+func TestCompareSkipsPassMarkURLWhenTierComponentLacksPassMarkID(t *testing.T) {
+	items := []db.Hardware{
+		{ID: "cpu:amd-ryzen-5-5600x", Kind: db.KindCPU, Name: "AMD Ryzen 5 5600X", NormalizedName: "amd ryzen 5 5600x", Vendor: "AMD", MultiScore: 21820, SingleScore: 3366, GamingRankScore: 3.1, PassMarkID: "3859"},
+		{ID: "cpu:intel-core-i7-6700", Kind: db.KindCPU, Name: "Intel Core i7-6700", NormalizedName: "intel core i7-6700", Vendor: "Intel", MultiScore: 8080, SingleScore: 2360, GamingRankScore: 1.5, PassMarkID: ""},
+		{ID: "cpu:amd-ryzen-7-7800x3d", Kind: db.KindCPU, Name: "AMD Ryzen 7 7800X3D", NormalizedName: "amd ryzen 7 7800x3d", Vendor: "AMD", MultiScore: 34320, SingleScore: 3890, GamingRankScore: 4.0, PassMarkID: "5299"},
+		{ID: "gpu:geforce-rtx-4070", Kind: db.KindGPU, Name: "GeForce RTX 4070", NormalizedName: "geforce rtx 4070", Vendor: "NVIDIA", MultiScore: 26851, GamingRankScore: 26851, PassMarkID: "4795"},
+	}
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logBuf, nil))
+	lru := cache.New[string, parser.ParseResult](100)
+	srv := httpapi.NewServer(nil, parser.NewCatalog(items), lru, logger, db.Metadata{Source: "test"}, false, "")
+
+	payload := `{
+		"app_id": "1091500",
+		"user": {"cpu_id": "cpu:amd-ryzen-5-5600x", "gpu_id": "gpu:geforce-rtx-4070", "ram_gb": 16},
+		"tiers": [
+			{"key": "win:minimum", "os": "win", "tier": "minimum", "cpu": "Intel Core i7-6700", "gpu": "", "ram": "12 GB RAM"},
+			{"key": "win:recommended", "os": "win", "tier": "recommended", "cpu": "AMD Ryzen 7 7800X3D", "gpu": "", "ram": "16 GB RAM"}
+		]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/compare", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /compare = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Results map[string]struct {
+			CPU struct {
+				PassMarkCompareURL string `json:"passmark_compare_url"`
+			} `json:"cpu"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Results["win:minimum"].CPU.PassMarkCompareURL != "" {
+		t.Fatalf("expected empty CPU URL for minimum without PassMarkID, got %q", resp.Results["win:minimum"].CPU.PassMarkCompareURL)
+	}
+	wantRec := "https://www.cpubenchmark.net/compare/AMD-Ryzen-5-5600X-vs-AMD-Ryzen-7-7800X3D/3859vs5299"
+	if resp.Results["win:recommended"].CPU.PassMarkCompareURL != wantRec {
+		t.Fatalf("recommended CPU URL = %q, want %q", resp.Results["win:recommended"].CPU.PassMarkCompareURL, wantRec)
+	}
+}
+
 func TestRootRedirectToAMO(t *testing.T) {
 	handler, _, cleanup := setupTestHandler(t, 60, 20)
 	defer cleanup()

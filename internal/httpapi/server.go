@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/paulo-sampaio/vapor-api/internal/cache"
 	"github.com/paulo-sampaio/vapor-api/internal/compare"
@@ -91,7 +92,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := strings.TrimSpace(q.Get("q"))
-	if len(query) < 2 || len(query) > 80 {
+	qLen := utf8.RuneCountInString(query)
+	if qLen < 2 || qLen > 80 {
 		writeError(w, http.StatusBadRequest, "invalid_query", "Query parameter 'q' must be between 2 and 80 characters.")
 		return
 	}
@@ -253,10 +255,10 @@ func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			res := results[k]
-			if res.CPU.Status == parser.StatusMatched && cpuURL != "" {
+			if res.CPU.Status == parser.StatusMatched && res.CPU.MatchedPassMarkID != "" && cpuURL != "" {
 				res.CPU.PassMarkCompareURL = cpuURL
 			}
-			if res.GPU.Status == parser.StatusMatched && gpuURL != "" {
+			if res.GPU.Status == parser.StatusMatched && res.GPU.MatchedPassMarkID != "" && gpuURL != "" {
 				res.GPU.PassMarkCompareURL = gpuURL
 			}
 			results[k] = res
