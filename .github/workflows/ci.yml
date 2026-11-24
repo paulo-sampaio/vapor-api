@@ -2,17 +2,26 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches-ignore:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
   api-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
           go-version: "1.27"
           cache-dependency-path: go.sum
@@ -26,27 +35,71 @@ jobs:
         run: |
           go run ./cmd/sync --seed ./testdata/seed_hardware.json --out /tmp/seed.db
 
-  container-smoke:
+  detect-container-changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      changed: ${{ steps.filter.outputs.api }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Detect changed container inputs
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            api:
+              - 'cmd/**'
+              - 'internal/**'
+              - 'testdata/seed_hardware.json'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Containerfile'
+              - 'Containerfile.dockerignore'
+              - '.containerignore'
+              - '.github/workflows/ci.yml'
+
+  container-build-check:
+    needs: [detect-container-changes]
+    if: github.event_name == 'pull_request' && needs.detect-container-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: Build FROM scratch image with Podman
-        run: podman build -f Containerfile -t vapor-api:ci .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Containerfile
+          platforms: linux/amd64
+          build-args: DB_SOURCE=seed
+          push: false
+          load: true
+          tags: vapor-api:ci
+          cache-from: type=gha,scope=vapor-api
 
       - name: Smoke test read-only container
         run: |
-          podman run --rm -d --name vapor-ci --read-only -p 8080:8080 vapor-api:ci
-          trap 'podman stop vapor-ci || true' EXIT
+          set -euo pipefail
+          docker run --rm -d --name vapor-ci --read-only -p 8080:8080 vapor-api:ci
+          trap 'docker rm -f vapor-ci >/dev/null 2>&1 || true' EXIT
           for i in $(seq 1 20); do
             if curl -sf http://127.0.0.1:8080/healthz; then
               break
             fi
             sleep 0.5
           done
-          podman exec vapor-ci /vapor-api -healthcheck
+          docker exec vapor-ci /vapor-api -healthcheck
           curl -sf "http://127.0.0.1:8080/api/v1/hardware/search?type=gpu&q=rtx%204070"
           curl -sf -X POST http://127.0.0.1:8080/api/v1/compare \
             -H "Content-Type: application/json" \
             -d '{"app_id":"1091500","user":{"cpu_id":"cpu:amd-ryzen-5-5600x","gpu_id":"gpu:geforce-rtx-4070","ram_gb":16},"tiers":[{"key":"win:minimum","os":"win","tier":"minimum","cpu":"Intel Core i7-6700 or AMD Ryzen 5 1600","gpu":"GeForce GTX 1060 6GB","ram":"12 GB RAM"}]}'
-          podman logs vapor-ci | grep '"msg":"spec_parsed"'
+          docker logs vapor-ci 2>&1 | grep -q '"msg":"spec_parsed"'
