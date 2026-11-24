@@ -379,8 +379,18 @@ var (
 	reCPUIntelGen   = regexp.MustCompile(`\bcore\s+i([3579])(?:\s*-\s*|\s+)(\d{1,2})(?:st|nd|rd|th)\s+gen\b`)
 	reCPUIntelBase  = regexp.MustCompile(`\b(?:core\s+)?i([3579])(?:\s*-\s*|\s+)(\d{1,2})(?:000|xxx)(?:\s+series)?\b`)
 	reCPURyzenBase  = regexp.MustCompile(`\bryzen(?:\s+([3579]))?\s+(\d)(?:000|xxx)(?:\s+series)?\b`)
-	reCandCPUIntel  = regexp.MustCompile(`\bintel\s+core\s+i([3579])-(\d{4,5})([a-z0-9]*)\b`)
-	reCandCPURyzen  = regexp.MustCompile(`\bamd\s+ryzen\s+([3579])\s+(\d{4})([a-z0-9]*)\b`)
+	reCandCPUIntel       = regexp.MustCompile(`\bintel\s+core\s+i([3579])-(\d{4,5})([a-z0-9]*)\b`)
+	reCandCPURyzen       = regexp.MustCompile(`\bamd\s+ryzen\s+([3579])\s+(\d{4})([a-z0-9]*)\b`)
+	gpuSeriesCandRegexes = map[string]*regexp.Regexp{
+		"gtx": regexp.MustCompile(`\bgtx\s+(\d{3,4})([a-z]*)\b`),
+		"rtx": regexp.MustCompile(`\brtx\s+(\d{3,4})([a-z]*)\b`),
+		"gt":  regexp.MustCompile(`\bgt\s+(\d{3,4})([a-z]*)\b`),
+		"rx":  regexp.MustCompile(`\brx\s+(\d{3,4})([a-z]*)\b`),
+		"r9":  regexp.MustCompile(`\br9\s+(\d{3,4})([a-z]*)\b`),
+		"r7":  regexp.MustCompile(`\br7\s+(\d{3,4})([a-z]*)\b`),
+		"hd":  regexp.MustCompile(`\bhd\s+(\d{3,4})([a-z]*)\b`),
+		"arc": regexp.MustCompile(`\barc\s+(\d{3,4})([a-z]*)\b`),
+	}
 )
 
 func (c *Catalog) matchSeriesLowest(kind, norm string) (db.Hardware, bool) {
@@ -463,7 +473,10 @@ func parseGPUSeries(norm string) (gpuSeriesQuery, bool) {
 }
 
 func (c *Catalog) findLowestGPUInSeries(q gpuSeriesQuery) (db.Hardware, bool) {
-	reCand := regexp.MustCompile(`\b` + regexp.QuoteMeta(q.family) + `\s+(\d{3,4})([a-z]*)\b`)
+	reCand, ok := gpuSeriesCandRegexes[q.family]
+	if !ok {
+		return db.Hardware{}, false
+	}
 	type ranked struct {
 		hw  db.Hardware
 		num int
