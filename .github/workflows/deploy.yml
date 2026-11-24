@@ -1,0 +1,131 @@
+name: Build and Push to Artifact Registry
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'testdata/seed_hardware.json'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Containerfile'
+      - 'Containerfile.dockerignore'
+      - '.containerignore'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/deploy.yml'
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REPOSITORY: maer-io-repo
+  REGION: europe-west3
+  IMAGE_NAME: vapor-api
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci.yml
+
+  build-and-push:
+    needs: [ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+          cache-dependency-path: go.sum
+
+      - name: Sync live PassMark database
+        run: |
+          mkdir -p data
+          go run ./cmd/sync --out ./data/hardware.db --min-cpus 1000 --min-gpus 500
+
+      - name: Verify generated hardware.db
+        run: |
+          set -euo pipefail
+          test -s data/hardware.db
+          sqlite3 data/hardware.db "SELECT kind, COUNT(*) FROM hardware GROUP BY kind;"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build release image for smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Containerfile
+          platforms: linux/amd64
+          build-args: DB_SOURCE=prebaked
+          push: false
+          load: true
+          tags: vapor-api:release
+          cache-from: type=gha,scope=vapor-api
+
+      - name: Smoke test read-only release image
+        run: |
+          set -euo pipefail
+          docker run --rm -d --name vapor-release --read-only -p 8080:8080 vapor-api:release
+          trap 'docker rm -f vapor-release >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8080/healthz; then
+              break
+            fi
+            sleep 0.5
+          done
+          docker exec vapor-release /vapor-api -healthcheck
+          curl -sf "http://127.0.0.1:8080/api/v1/hardware/search?type=gpu&q=rtx"
+          curl -sf -X POST http://127.0.0.1:8080/api/v1/compare \
+            -H "Content-Type: application/json" \
+            -d '{"app_id":"1091500","user":{"cpu_id":"cpu:amd-ryzen-5-5600x","gpu_id":"gpu:geforce-rtx-4070","ram_gb":16},"tiers":[{"key":"win:minimum","os":"win","tier":"minimum","cpu":"Intel Core i7-6700 or AMD Ryzen 5 1600","gpu":"GeForce GTX 1060 6GB","ram":"12 GB RAM"}]}'
+          docker logs vapor-release 2>&1 | grep -q '"msg":"spec_parsed"'
+
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Docker Auth
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Generate sortable tag
+        id: tag
+        run: echo "value=main-$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Containerfile
+          platforms: linux/amd64
+          build-args: DB_SOURCE=prebaked
+          push: true
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha,scope=vapor-api
+          cache-to: type=gha,mode=max,scope=vapor-api
