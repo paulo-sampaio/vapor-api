@@ -78,7 +78,7 @@ func CORSMiddleware(extraOrigins []string) func(http.Handler) http.Handler {
 		if origin == "" {
 			return false
 		}
-		if strings.HasPrefix(origin, "moz-extension://") {
+		if strings.HasPrefix(origin, "moz-extension://") && len(origin) > len("moz-extension://") {
 			return true
 		}
 		_, ok := allowed[origin]
@@ -109,6 +109,8 @@ func CORSMiddleware(extraOrigins []string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+const maxRateLimitBuckets = 50000
 
 type tokenBucket struct {
 	tokens   float64
@@ -181,6 +183,17 @@ func (rl *RateLimiter) Allow(ip string) bool {
 
 	b, ok := rl.buckets[ip]
 	if !ok {
+		if len(rl.buckets) >= maxRateLimitBuckets {
+			cutoff := now.Add(-10 * time.Minute)
+			for k, v := range rl.buckets {
+				if v.lastSeen.Before(cutoff) {
+					delete(rl.buckets, k)
+				}
+			}
+			if len(rl.buckets) >= maxRateLimitBuckets {
+				return false
+			}
+		}
 		rl.buckets[ip] = &tokenBucket{
 			tokens:   rl.burst - 1.0,
 			lastSeen: now,
@@ -209,6 +222,7 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := rl.clientIP(r)
 		if !rl.Allow(ip) {
+			w.Header().Set("Retry-After", "1")
 			writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many requests; please slow down.")
 			return
 		}
