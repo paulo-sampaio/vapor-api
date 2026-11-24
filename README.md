@@ -26,11 +26,12 @@ api/
 │   └── syncer/                     # PassMark JSON/HTML fetcher, gaming_rank_score normalizer, DB finalizer
 ├── testdata/                       # Seed catalog (~140 parts), Steam spec corpus, PassMark HTML fixtures
 ├── Containerfile                   # Multi-stage golang:1.27-trixie -> FROM scratch build
-├── .containerignore
+├── Containerfile.dockerignore      # BuildKit ignore rules (mirrors .containerignore)
+├── .containerignore                # Podman ignore rules
 ├── go.mod
 └── .github/workflows/
-    ├── ci.yml                      # PR & push CI: go vet, race tests, seed DB build, scratch container smoke test
-    └── build-image.yml             # Main push + weekly Monday 04:00 UTC PassMark sync & GHCR publish
+    ├── ci.yml                      # Reusable & PR CI: go vet, race tests, seed DB build, scratch container smoke test
+    └── deploy.yml                  # Main push + weekly Monday 04:00 UTC PassMark sync & Artifact Registry publish
 ```
 
 ## Parsing & Scoring Model
@@ -123,7 +124,7 @@ podman exec vapor-api /vapor-api -healthcheck
 
 ### Kubernetes Deployment Notes
 
-- **Image:** `ghcr.io/paulo-sampaio/vapor-api:latest` (automatically refreshed weekly via `.github/workflows/build-image.yml`).
+- **Image:** `europe-west3-docker.pkg.dev/<GCP_PROJECT_ID>/maer-io-repo/vapor-api:latest` (alongside `sha-<commit>` and sortable `main-<YYYYMMDDHHMMSS>-<short-sha>` tags, automatically refreshed weekly via `.github/workflows/deploy.yml`).
 - **Reverse Proxy:** Set `VAPOR_TRUST_PROXY=true` so rate limiting reads `X-Forwarded-For` / `X-Real-IP`.
 - **Probes:** HTTP `GET /healthz` on port `8080`.
 - **SecurityContext:** `readOnlyRootFilesystem: true`, `runAsNonRoot: true`, `runAsUser: 65532`, `allowPrivilegeEscalation: false`.
